@@ -79,11 +79,8 @@ if (process.env.NODE_ENV === "production") {
 const allowedOrigins = [
   "http://localhost:5173",
 
-  "http://zozo.com.bd",
-  "http://kroykori.com",
-
   "https://kroykori.com",
-  "https://www.kroykori.com",
+  "https://tracvd-frontend-lake.vercel.app",
 
  
 ];
