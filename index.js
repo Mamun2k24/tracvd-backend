@@ -48,7 +48,7 @@ import adminMarketplaceRoutes from "./routes/adminMarketplaceRoutes.js";
 import returnRequestRoutes from "./routes/returnRequestRoutes.js";
 import landingPageRoutes from "./routes/landingPageRoutes.js";
 import demoRequestRoutes from "./routes/demoRequest.route.js";
-
+import siteReviewRoutes from "./routes/siteReview.routes.js";
 /* =====================================================
    Environment variables
 ===================================================== */
@@ -335,6 +335,7 @@ app.use("/api/cart", cartRoutes);
 app.use("/api", orderRoutes);
 
 app.use("/api/banners", bannerRoutes);
+app.use("/api/site-reviews", siteReviewRoutes);
 app.use("/api/videos", videoRoutes);
 
 app.use(
