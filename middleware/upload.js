@@ -31,7 +31,6 @@
 
 // export default upload;
 
-// uporer image upload system holo server a upload korar jonno
 
 import multer from "multer";
 

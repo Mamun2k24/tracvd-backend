@@ -1,7 +1,8 @@
-// index.js
+
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
+import path from "node:path";
 import { Server } from "socket.io";
 import cors from "cors";
 import session from "express-session";
@@ -49,6 +50,8 @@ import returnRequestRoutes from "./routes/returnRequestRoutes.js";
 import landingPageRoutes from "./routes/landingPageRoutes.js";
 import demoRequestRoutes from "./routes/demoRequest.route.js";
 import siteReviewRoutes from "./routes/siteReview.routes.js";
+import blogRoutes from "./routes/blog.routes.js";
+import monthlyPaymentRoutes from "./routes/monthlyPayment.routes.js";
 /* =====================================================
    Environment variables
 ===================================================== */
@@ -78,11 +81,8 @@ if (process.env.NODE_ENV === "production") {
 
 const allowedOrigins = [
   "http://localhost:5173",
-
   "https://kroykori.com",
   "https://tracvd-frontend-lake.vercel.app",
-
- 
 ];
 
 /* =====================================================
@@ -152,9 +152,11 @@ io.on("connection", (socket) => {
 const corsOptions = {
   origin: (origin, callback) => {
     /*
-     * Postman, server-to-server request এবং একই origin-এর
-     * request-এর ক্ষেত্রে origin নাও থাকতে পারে।
+     * Postman, server-to-server request এবং
+     * একই origin-এর request-এর ক্ষেত্রে
+     * origin নাও থাকতে পারে।
      */
+
     if (!origin) {
       return callback(null, true);
     }
@@ -195,6 +197,30 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 /* =====================================================
+   BLOG IMAGE STATIC FILE SERVING
+   FIX: /uploads/blog/... 404 Route not found
+
+   Must match middleware/blogUpload.js:
+   path.join(process.cwd(), "uploads", "blog")
+===================================================== */
+
+const blogImageDirectory = path.join(
+  process.cwd(),
+  "uploads",
+  "blog"
+);
+
+app.use(
+  "/uploads/blog",
+  express.static(blogImageDirectory, {
+    index: false,
+    dotfiles: "deny",
+    fallthrough: true,
+    maxAge: "1d",
+  })
+);
+
+/* =====================================================
    Common middleware
 ===================================================== */
 
@@ -232,21 +258,22 @@ app.use(
       mongoUrl: process.env.MONGO_URL,
 
       /*
-       * Expired session 24 ঘণ্টা পরে MongoDB থেকে
-       * automatically remove হবে।
+       * Expired session 24 ঘণ্টা পরে
+       * MongoDB থেকে automatically remove হবে।
        */
       ttl: 24 * 60 * 60,
     }),
 
     cookie: {
       maxAge: 1000 * 60 * 60 * 24,
+
       secure:
-        process.env.NODE_ENV ===
-        "production",
+        process.env.NODE_ENV === "production",
+
       httpOnly: true,
 
       /*
-       * Frontend এবং backend ভিন্ন domain হলে
+       * Frontend এবং Backend ভিন্ন domain হলে
        * production-এ "none" প্রয়োজন।
        */
       sameSite:
@@ -308,16 +335,19 @@ app.use((req, res, next) => {
    API routes
 ===================================================== */
 
+// Authentication
 app.use("/api/auth", authRoutes);
 
 /*
- * Report routes সাধারণ API routes-এর আগে রাখা হয়েছে,
- * যাতে অন্য কোনো dynamic route আগে match না করে।
+ * Report routes সাধারণ API routes-এর আগে
+ * রাখা হয়েছে।
  */
 app.use("/api", reportRoutes);
 
+// Users
 app.use("/api/users", userRoutes);
 
+// Categories
 app.use(
   "/api/categories",
   categoryRoutes
@@ -328,15 +358,37 @@ app.use(
   categoryRoutes
 );
 
+// Products
 app.use("/api/products", productRoutes);
 app.use("/api/colors", colorRoutes);
+
+// Cart
 app.use("/api/cart", cartRoutes);
 
+// Orders
 app.use("/api", orderRoutes);
 
+// Banners
 app.use("/api/banners", bannerRoutes);
-app.use("/api/site-reviews", siteReviewRoutes);
+
+// Website Testimonials
+app.use(
+  "/api/site-reviews",
+  siteReviewRoutes
+);
+
+// Video Management
 app.use("/api/videos", videoRoutes);
+
+// ========================================
+// BLOG MANAGEMENT API
+// ========================================
+
+app.use("/api/blogs", blogRoutes);
+
+// ========================================
+// Other existing routes
+// ========================================
 
 app.use(
   "/api",
@@ -349,71 +401,102 @@ app.use("/api", couponAdminRoutes);
 app.use("/api", adminStatsRoutes);
 app.use("/api", analyticsRoutes);
 
+// Subcategories
 app.use(
   "/api/subcategories",
   subCategoryRoutes
 );
 
+// Brands
 app.use("/api/brands", brandRoutes);
 
+// Home Section Settings
 app.use(
   "/api/home-section-settings",
   homeSectionSettingRoutes
 );
 
+// Ticker
 app.use("/api", siteTickerRoutes);
 
+// Header Settings
 app.use(
   "/api/header-settings",
   headerSettingRoutes
 );
 
+// Shipping Settings
 app.use(
   "/api/shipping-settings",
   shippingSettingsRoutes
 );
+
+// Landing Pages
 app.use(
- "/api/landing-pages",
- landingPageRoutes
+  "/api/landing-pages",
+  landingPageRoutes
 );
+
+// Notifications
 app.use(
   "/api/notifications",
   notificationRoutes
 );
 
+// Reviews
 app.use("/api", reviewRoutes);
+
+// General Settings
 app.use("/api", generalSettingsRoutes);
 
+// Flash Sale Settings
 app.use(
   "/api/flashsale/settings",
   flashSaleSettingsRoute
 );
 
+// Chat
 app.use("/api", chatRoutes);
 
+// Chatbot
 app.use(
   "/api",
   chatBotQuestionRoutes
 );
 
+// Steadfast
 app.use("/api", steadfastRoutes);
+
+// Shop
 app.use("/api", shopRoutes);
+
+// Seller Wallet
 app.use("/api", sellerWalletRoutes);
+
+// Admin Marketplace
 app.use(
   "/api/admin/marketplace",
-  adminMarketplaceRoutes,
+  adminMarketplaceRoutes
 );
 
+// Return Requests
 app.use(
   "/api/returns",
-  returnRequestRoutes,
+  returnRequestRoutes
 );
 
-// GPS Free Demo API
-app.use("/api/demo", demoRequestRoutes);
-
+// GPS Free Demo
+app.use(
+  "/api/demo",
+  demoRequestRoutes
+);
+app.use("/api/monthly-payments", monthlyPaymentRoutes);
 /* =====================================================
    404 handler
+
+   IMPORTANT:
+   Static Blog Image Route and all API Routes
+   must be registered before this handler.
 ===================================================== */
 
 app.use((req, res) => {
@@ -465,9 +548,13 @@ app.use((err, _req, res, _next) => {
 ===================================================== */
 
 /*
- * Vercel serverless environment-এ app export হবে।
- * Local এবং Railway-তে HTTP server listen করবে।
+ * Vercel serverless environment-এ
+ * app export হবে।
+ *
+ * Local এবং Railway-তে
+ * HTTP server listen করবে।
  */
+
 if (!process.env.VERCEL) {
   server.listen(port, async () => {
     console.log(
@@ -488,4 +575,5 @@ if (!process.env.VERCEL) {
 /*
  * Vercel Serverless Function-এর জন্য export।
  */
+
 export default app;
