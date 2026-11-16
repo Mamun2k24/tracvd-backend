@@ -1,247 +1,115 @@
+import { Brand } from "../model/index.model.js";
+import { uploadToImgbb } from "../utils/uploadToImgbb.js";
 
-import fs from "node:fs/promises";
-import path from "node:path";
-import crypto from "node:crypto";
-
-import { Banner } from "../model/index.model.js";
-import { bannerUploadDir } from "../middleware/bannerUpload.js";
-
-// ========================================
-// Verify actual image file type
-// ========================================
-
-const detectImageType = (buffer) => {
-  if (
-    buffer.length >= 3 &&
-    buffer[0] === 0xff &&
-    buffer[1] === 0xd8 &&
-    buffer[2] === 0xff
-  ) {
-    return "image/jpeg";
-  }
-
-  if (
-    buffer.length >= 8 &&
-    buffer.subarray(0, 8).equals(
-      Buffer.from([
-        137, 80, 78, 71, 13, 10, 26, 10,
-      ])
-    )
-  ) {
-    return "image/png";
-  }
-
-  if (
-    buffer.length >= 12 &&
-    buffer.toString("ascii", 0, 4) === "RIFF" &&
-    buffer.toString("ascii", 8, 12) === "WEBP"
-  ) {
-    return "image/webp";
-  }
-
-  return null;
-};
-
-// ========================================
-// Build public banner image URL
-// ========================================
-
-const getPublicImageUrl = (req, filename) => {
-  const base = (
-    process.env.BANNER_PUBLIC_BASE_URL ||
-    `${req.protocol}://${req.get("host")}`
-  ).replace(/\/+$/, "");
-
-  return `${base}/uploads/banners/${filename}`;
-};
-
-// ========================================
-// Delete only images in local banner folder
-// ========================================
-
-const removeLocalBannerImage = async (imageUrl) => {
-  if (!imageUrl) return;
-
+export const addBrand = async (req, res) => {
   try {
-    const url = new URL(
-      imageUrl,
-      "http://localhost"
-    );
+    const { name, website, isActive } = req.body;
+    const file = req.file;
 
-    if (
-      !url.pathname.startsWith("/uploads/banners/")
-    ) {
-      return;
-    }
-
-    const filename = path.basename(url.pathname);
-
-    // Only server-generated banner filenames
-    const validFilename =
-      /^[0-9a-f-]{36}\.(jpg|png|webp)$/i.test(
-        filename
-      ) &&
-      crypto.version
-        ? true
-        : false;
-
-    if (!validFilename) return;
-
-    const filePath = path.join(
-      bannerUploadDir,
-      filename
-    );
-
-    await fs.rm(filePath, {
-      force: true,
-    });
-  } catch (error) {
-    console.warn(
-      "Local banner image cleanup failed:",
-      error.message
-    );
-  }
-};
-
-// ========================================
-// POST /api/banners
-// Add Banner
-// ========================================
-
-export const addBanner = async (req, res) => {
-  const image = req.file;
-
-  if (!image) {
-    return res.status(400).json({
-      message: "Banner image is required",
-    });
-  }
-
-  try {
-    const fileBuffer = await fs.readFile(
-      image.path
-    );
-
-    const actualType = detectImageType(
-      fileBuffer.subarray(0, 16)
-    );
-
-    if (actualType !== image.mimetype) {
-      await fs.rm(image.path, {
-        force: true,
-      });
-
+    if (!name || !file) {
       return res.status(400).json({
-        message: "Invalid image file",
+        message: "Brand name and logo required",
       });
     }
 
-    const imageUrl = getPublicImageUrl(
-      req,
-      image.filename
+    const imgbb = await uploadToImgbb(
+      file.buffer,
+      file.originalname,
+      process.env.IMGBB_API_KEY
     );
 
-    const newBanner = new Banner({
-      title: String(req.body.title || "")
-        .trim()
-        .slice(0, 200),
-
-      imageUrl,
-
-      // Old ImgBB fields kept empty for compatibility
-      imgbbDeleteUrl: "",
-      imgbbId: "",
+    const brand = await Brand.create({
+      name,
+      logo: imgbb.url,
+      website: website || "",
+      isActive:
+        typeof isActive === "string"
+          ? isActive === "true"
+          : !!isActive,
     });
 
-    await newBanner.save();
-
-    return res.status(201).json({
-      message: "Banner uploaded successfully",
-      banner: newBanner,
+    res.status(201).json({
+      message: "Brand added successfully",
+      brand,
     });
   } catch (error) {
-    await fs.rm(image.path, {
-      force: true,
-    }).catch(() => {});
-
-    console.error(
-      "Banner upload error:",
-      error
-    );
-
-    return res.status(500).json({
-      message: "Failed to upload banner",
+    console.error(error);
+    res.status(500).json({
+      message: error.message,
     });
   }
 };
 
-// ========================================
-// GET /api/banners
-// Get all banners
-// ========================================
 
-export const getBanners = async (_req, res) => {
+// GET আগের মতই
+export const getBrands = async (req, res) => {
   try {
-    const banners = await Banner.find().sort({
-      uploadedAt: -1,
-    });
-
-    return res.status(200).json(banners);
+    const brands = await Brand.find({}).sort({ createdAt: -1 });
+    res.status(200).json(brands);
   } catch (error) {
-    console.error(
-      "Get banners error:",
-      error
-    );
-
-    return res.status(500).json({
-      message: "Failed to fetch banners",
-    });
+    console.error("Error fetching brands:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-// ========================================
-// DELETE /api/banners/:id
-// Delete banner and local image
-// ========================================
-
-export const deleteBanner = async (req, res) => {
+// UPDATE
+export const updateBrand = async (req, res) => {
   try {
-    const banner = await Banner.findById(
-      req.params.id
-    );
+    const { id } = req.params;
+    const { name, website, isActive } = req.body;
+    const file = req.file;
 
-    if (!banner) {
-      return res.status(404).json({
-        message: "Banner not found",
-      });
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (website !== undefined) updateData.website = website;
+    if (typeof isActive !== "undefined") {
+      updateData.isActive =
+        typeof isActive === "string" ? isActive === "true" : !!isActive;
+    }
+   if (file) {
+  const imgbb = await uploadToImgbb(
+    file.buffer,
+    file.originalname,
+    process.env.IMGBB_API_KEY
+  );
+
+  updateData.logo = imgbb.url;
+}
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "Nothing to update" });
     }
 
-    const deleted = await Banner.findByIdAndDelete(
-      req.params.id
-    );
+    const brand = await Brand.findByIdAndUpdate(id, updateData, { new: true });
 
-    // Delete local image, if it belongs
-    // to the new local upload system.
-    await removeLocalBannerImage(
-      banner.imageUrl
-    );
+    if (!brand) {
+      return res.status(404).json({ message: "Brand not found" });
+    }
 
-    // Old ImgBB banners:
-    // their database records are deleted,
-    // but externally hosted images are untouched.
-
-    return res.status(200).json({
-      message: "Banner deleted successfully",
-      banner: deleted,
-    });
+    res
+      .status(200)
+      .json({ message: "Brand updated successfully", brand });
   } catch (error) {
-    console.error(
-      "Delete banner error:",
-      error
-    );
+    console.error("Error updating brand:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
 
-    return res.status(500).json({
-      message: "Failed to delete banner",
-    });
+// DELETE আগের মতই
+export const deleteBrand = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Brand.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Brand not found" });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Brand deleted successfully", brand: deleted });
+  } catch (error) {
+    console.error("Error deleting brand:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 };

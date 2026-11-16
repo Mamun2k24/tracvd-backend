@@ -3,8 +3,8 @@ import express from "express";
 
 import bannerUpload from "../middleware/bannerUpload.js";
 
-import protect from "../middleware/protect.js";
-import ensureAdmin from "../middleware/isAdmin.js";
+import { protect } from "../middleware/protect.js";
+import { isAdmin as ensureAdmin } from "../middleware/isAdmin.js";
 
 import {
   addBanner,
