@@ -52,6 +52,7 @@ import demoRequestRoutes from "./routes/demoRequest.route.js";
 import siteReviewRoutes from "./routes/siteReview.routes.js";
 import blogRoutes from "./routes/blog.routes.js";
 import monthlyPaymentRoutes from "./routes/monthlyPayment.routes.js";
+
 /* =====================================================
    Environment variables
 ===================================================== */
@@ -199,10 +200,12 @@ app.use(cors(corsOptions));
 
 /* =====================================================
    BLOG IMAGE STATIC FILE SERVING
-   FIX: /uploads/blog/... 404 Route not found
 
-   Must match middleware/blogUpload.js:
-   path.join(process.cwd(), "uploads", "blog")
+   Storage:
+   backend/uploads/blog/
+
+   Public URL:
+   /uploads/blog/filename.png
 ===================================================== */
 
 const blogImageDirectory = path.join(
@@ -214,6 +217,32 @@ const blogImageDirectory = path.join(
 app.use(
   "/uploads/blog",
   express.static(blogImageDirectory, {
+    index: false,
+    dotfiles: "deny",
+    fallthrough: true,
+    maxAge: "1d",
+  })
+);
+
+/* =====================================================
+   BANNER IMAGE STATIC FILE SERVING
+
+   Storage:
+   backend/uploads/banners/
+
+   Public URL:
+   /uploads/banners/filename.png
+===================================================== */
+
+const bannerImageDirectory = path.join(
+  process.cwd(),
+  "uploads",
+  "banners"
+);
+
+app.use(
+  "/uploads/banners",
+  express.static(bannerImageDirectory, {
     index: false,
     dotfiles: "deny",
     fallthrough: true,
@@ -381,24 +410,21 @@ app.use(
 // Video Management
 app.use("/api/videos", videoRoutes);
 
-// ========================================
-// BLOG MANAGEMENT API
-// ========================================
-
+// Blog Management
 app.use("/api/blogs", blogRoutes);
 
-// ========================================
-// Other existing routes
-// ========================================
-
+// Seller Verification
 app.use(
   "/api",
   sellerVerificationRoutes
 );
 
+// Invoices and Coupons
 app.use("/api", invoiceRoutes);
 app.use("/api", couponRoutes);
 app.use("/api", couponAdminRoutes);
+
+// Analytics
 app.use("/api", adminStatsRoutes);
 app.use("/api", analyticsRoutes);
 
@@ -491,13 +517,17 @@ app.use(
   "/api/demo",
   demoRequestRoutes
 );
-app.use("/api/monthly-payments", monthlyPaymentRoutes);
+
+// Monthly Payment System
+app.use(
+  "/api/monthly-payments",
+  monthlyPaymentRoutes
+);
+
 /* =====================================================
    404 handler
 
-   IMPORTANT:
-   Static Blog Image Route and all API Routes
-   must be registered before this handler.
+   All API and static routes must be above this.
 ===================================================== */
 
 app.use((req, res) => {
