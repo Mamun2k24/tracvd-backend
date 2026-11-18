@@ -52,6 +52,7 @@ import demoRequestRoutes from "./routes/demoRequest.route.js";
 import siteReviewRoutes from "./routes/siteReview.routes.js";
 import blogRoutes from "./routes/blog.routes.js";
 import monthlyPaymentRoutes from "./routes/monthlyPayment.routes.js";
+import corporateInquiryRoutes from "./routes/corporateInquiry.routes.js";
 
 /* =====================================================
    Environment variables
@@ -526,6 +527,7 @@ app.use(
   monthlyPaymentRoutes
 );
 
+app.use("/api/corporate-inquiries", corporateInquiryRoutes);
 /* =====================================================
    404 handler
 
